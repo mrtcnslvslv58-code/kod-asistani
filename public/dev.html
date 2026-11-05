@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kod Asistanı — Modül Testi (dev)</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #1a1a1a; }
+    body { margin: 0; padding: 12px; background: #f4f4f5; }
+    h1 { font-size: 1.1rem; margin: 0 0 12px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .col { flex: 1 1 320px; min-width: 280px; }
+    label { display: block; font-size: 0.8rem; margin-bottom: 4px; color: #444; }
+    input, textarea, select, button {
+      width: 100%; box-sizing: border-box; padding: 8px; margin-bottom: 8px;
+      border: 1px solid #ccc; border-radius: 6px; font: inherit;
+    }
+    button { width: auto; cursor: pointer; background: #2563eb; color: #fff; border: none; padding: 8px 14px; }
+    button.secondary { background: #52525b; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #answer {
+      white-space: pre-wrap; background: #fff; border: 1px solid #ddd;
+      border-radius: 6px; padding: 10px; min-height: 120px; max-height: 280px; overflow: auto;
+      font-size: 0.9rem;
+    }
+    iframe {
+      width: 100%; height: 360px; border: 1px solid #ddd; border-radius: 6px; background: #fff;
+    }
+    #consoleOut {
+      background: #18181b; color: #e4e4e7; font-family: ui-monospace, monospace;
+      font-size: 0.75rem; padding: 8px; border-radius: 6px; min-height: 80px; max-height: 160px;
+      overflow: auto; white-space: pre-wrap;
+    }
+    .err { color: #b91c1c; font-size: 0.85rem; margin: 4px 0 8px; }
+    .ok { color: #15803d; font-size: 0.85rem; }
+    .panel { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <h1>Kod Asistanı — Model / Preview test sayfası</h1>
+
+  <div class="panel">
+    <label for="apiKey">Gemini API anahtarı (localStorage: gemini_key)</label>
+    <input id="apiKey" type="password" placeholder="AIza..." autocomplete="off" />
+    <label for="modelName">Model</label>
+    <input id="modelName" type="text" />
+    <button type="button" id="saveKey">Anahtarı kaydet</button>
+    <span id="keyStatus" class="ok"></span>
+  </div>
+
+  <div class="row">
+    <div class="col panel">
+      <label for="prompt">Komut</label>
+      <textarea id="prompt" rows="4" placeholder="Örn: Basit bir sayaç web uygulaması yaz (html, css, js)"></textarea>
+      <button type="button" id="sendBtn">Gönder (stream)</button>
+      <button type="button" id="mockBtn" class="secondary">Sahte SSE ile dene</button>
+      <button type="button" id="abortBtn" class="secondary">İptal</button>
+      <div id="err" class="err"></div>
+      <label>Yanıt</label>
+      <div id="answer"></div>
+      <button type="button" id="previewBtn">parseFiles → Önizle</button>
+      <button type="button" id="zipBtn" class="secondary">ZIP indir</button>
+    </div>
+    <div class="col panel">
+      <label>Önizleme</label>
+      <iframe id="frame" title="Önizleme"></iframe>
+      <label>Konsol (iframe)</label>
+      <div id="consoleOut"></div>
+    </div>
+  </div>
+
+  <script src="./model.js"></script>
+  <script src="./preview.js"></script>
+  <script>
+    (function () {
+      var apiKey = document.getElementById('apiKey');
+      var modelName = document.getElementById('modelName');
+      var promptEl = document.getElementById('prompt');
+      var answer = document.getElementById('answer');
+      var err = document.getElementById('err');
+      var frame = document.getElementById('frame');
+      var consoleOut = document.getElementById('consoleOut');
+      var keyStatus = document.getElementById('keyStatus');
+      var lastFiles = {};
+      var abortCtrl = null;
+
+      apiKey.value = Model.getKey();
+      modelName.value = Model.getModel();
+
+      Preview.onConsole(function (entry) {
+        consoleOut.textContent +=
+          '[' + entry.level + '] ' + (entry.message || '') + '\n';
+        consoleOut.scrollTop = consoleOut.scrollHeight;
+      });
+
+      document.getElementById('saveKey').onclick = function () {
+        Model.setKey(apiKey.value);
+        Model.setModel(modelName.value);
+        keyStatus.textContent = 'Kaydedildi · model=' + Model.getModel();
+      };
+
+      function showError(e) {
+        err.textContent = (e && e.message) || String(e);
+      }
+
+      document.getElementById('sendBtn').onclick = async function () {
+        err.textContent = '';
+        answer.textContent = '';
+        Model.setKey(apiKey.value);
+        Model.setModel(modelName.value);
+        abortCtrl = new AbortController();
+        try {
+          var text = await Model.chat(
+            [{ role: 'user', content: promptEl.value }],
+            function (soFar) {
+              answer.textContent = soFar;
+            },
+            { signal: abortCtrl.signal }
+          );
+          answer.textContent = text;
+          lastFiles = Model.parseFiles(text);
+        } catch (e) {
+          showError(e);
+        }
+      };
+
+      document.getElementById('abortBtn').onclick = function () {
+        if (abortCtrl) abortCtrl.abort();
+      };
+
+      /** Gerçek anahtar olmadan stream + önizleme testi */
+      document.getElementById('mockBtn').onclick = async function () {
+        err.textContent = '';
+        answer.textContent = '';
+        var fake =
+          'İşte basit bir sayaç:\n\n' +
+          '```html file=index.html\n' +
+          '<!DOCTYPE html>\n<html lang="tr"><head><meta charset="utf-8"/>' +
+          '<title>Sayaç</title><link rel="stylesheet" href="style.css"/></head>' +
+          '<body><h1 id="n">0</h1><button id="b">Artır</button>' +
+          '<script src="script.js"><\\/script></body></html>\n' +
+          '```\n\n' +
+          '```css file=style.css\n' +
+          'body{font-family:sans-serif;text-align:center;padding:2rem}\n' +
+          'button{font-size:1.2rem;padding:.5rem 1rem}\n' +
+          '```\n\n' +
+          '```js file=script.js\n' +
+          'var n=0;var el=document.getElementById("n");\n' +
+          'document.getElementById("b").onclick=function(){n++;el.textContent=n;console.log("sayac",n)};\n' +
+          'console.log("hazir");\n' +
+          '```\n';
+
+        // Sahte SSE: Model.chat yerine fetch'i geçici mock'la
+        var chunks = [
+          'data: {"candidates":[{"content":{"parts":[{"text":"İşte basit"}]}}]}\n\n',
+          'data: {"candidates":[{"content":{"parts":[{"text":" bir sayaç:\\n\\n"}]}}]}\n\n',
+        ];
+        // Büyük parçayı birkaç SSE olayına böl
+        var mid = Math.floor(fake.length / 2);
+        chunks.push(
+          'data: ' +
+            JSON.stringify({
+              candidates: [{ content: { parts: [{ text: fake.slice(0, mid) }] } }],
+            }) +
+            '\n\n'
+        );
+        chunks.push(
+          'data: ' +
+            JSON.stringify({
+              candidates: [{ content: { parts: [{ text: fake.slice(mid) }] } }],
+            }) +
+            '\n\n'
+        );
+
+        var originalFetch = window.fetch;
+        window.fetch = function () {
+          var encoder = new TextEncoder();
+          var i = 0;
+          var stream = new ReadableStream({
+            pull: function (controller) {
+              if (i >= chunks.length) {
+                controller.close();
+                return;
+              }
+              controller.enqueue(encoder.encode(chunks[i++]));
+            },
+          });
+          return Promise.resolve(
+            new Response(stream, {
+              status: 200,
+              headers: { 'Content-Type': 'text/event-stream' },
+            })
+          );
+        };
+        Model.setKey(apiKey.value || 'mock-key-for-test');
+        try {
+          var text = await Model.chat(
+            [{ role: 'user', content: 'mock' }],
+            function (soFar) {
+              answer.textContent = soFar;
+            }
+          );
+          // fake stream was partial+full overlap for demo; prefer full fake for parse
+          answer.textContent = fake;
+          lastFiles = Model.parseFiles(fake);
+          Preview.render(lastFiles, frame);
+          keyStatus.textContent = 'Sahte SSE + önizleme tamam';
+        } catch (e) {
+          showError(e);
+        } finally {
+          window.fetch = originalFetch;
+        }
+      };
+
+      document.getElementById('previewBtn').onclick = function () {
+        err.textContent = '';
+        try {
+          var src = answer.textContent || '';
+          lastFiles = Model.parseFiles(src);
+          if (!Object.keys(lastFiles).length) {
+            showError(new Error('parseFiles boş döndü — fence\'li kod bloğu var mı?'));
+            return;
+          }
+          Preview.render(lastFiles, frame);
+        } catch (e) {
+          showError(e);
+        }
+      };
+
+      document.getElementById('zipBtn').onclick = function () {
+        if (!Object.keys(lastFiles).length) {
+          lastFiles = Model.parseFiles(answer.textContent || '');
+        }
+        Preview.download(lastFiles, 'kod-asistani-proje.zip');
+      };
+    })();
+  </script>
+</body>
+</html>

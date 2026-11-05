@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KodAsistan</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&lt;/&gt;</span>
+      <h1>KodAsistan</h1>
+    </div>
+
+    <div class="topbar-controls">
+      <label class="lang-select">
+        <span class="sr-only">Dil</span>
+        <select id="lang-select" title="Dosya dili">
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="js">JavaScript</option>
+          <option value="single">Tek dosya</option>
+        </select>
+      </label>
+      <button type="button" id="btn-settings" class="btn btn-ghost" title="Ayarlar">Ayarlar</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Sol: sohbet -->
+    <section class="panel chat-panel" aria-label="Sohbet">
+      <div class="panel-header">
+        <h2>Sohbet</h2>
+        <button type="button" id="btn-clear-chat" class="btn btn-tiny" title="Geçmişi temizle">Temizle</button>
+      </div>
+      <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <textarea
+          id="chat-input"
+          rows="2"
+          placeholder="Ne yapmak istiyorsun? (Enter gönder, Shift+Enter satır)"
+          autocomplete="off"
+        ></textarea>
+        <button type="submit" id="btn-send" class="btn btn-primary">Gönder</button>
+      </form>
+    </section>
+
+    <!-- Orta: kod -->
+    <section class="panel editor-panel" aria-label="Kod editörü">
+      <div class="panel-header">
+        <h2>Kod</h2>
+        <span id="editor-lang-label" class="muted">HTML</span>
+      </div>
+      <textarea
+        id="code-editor"
+        class="code-editor"
+        spellcheck="false"
+        placeholder="<!-- Kod burada görünecek -->"
+      ></textarea>
+    </section>
+
+    <!-- Sağ/alt: önizleme -->
+    <section class="panel preview-panel" aria-label="Önizleme">
+      <div class="panel-header">
+        <h2>Önizleme</h2>
+        <div class="preview-actions">
+          <button type="button" id="btn-refresh-preview" class="btn btn-tiny">Yenile</button>
+          <button type="button" id="btn-download" class="btn btn-tiny">İndir</button>
+        </div>
+      </div>
+      <div class="preview-frame-wrap">
+        <iframe id="preview-frame" title="Canlı önizleme" sandbox="allow-scripts allow-same-origin"></iframe>
+        <div id="preview-placeholder" class="preview-placeholder">
+          Önizleme burada görünecek
+        </div>
+      </div>
+      <div id="console-log" class="console-log" hidden></div>
+    </section>
+  </main>
+
+  <!-- Ayarlar modal -->
+  <dialog id="settings-dialog" class="settings-dialog">
+    <form method="dialog" id="settings-form" class="settings-form">
+      <h3>Ayarlar</h3>
+      <label class="field">
+        <span>Gemini API anahtarı</span>
+        <input
+          type="password"
+          id="api-key-input"
+          autocomplete="off"
+          placeholder="AIza… (değer maskelenir)"
+        />
+      </label>
+      <p class="hint">Anahtar yalnızca bu tarayıcıda localStorage’da saklanır; sohbete yazılmaz.</p>
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" class="btn btn-ghost">İptal</button>
+        <button type="submit" value="save" class="btn btn-primary" id="btn-save-key">Kaydet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Sıra: model → preview → app (REİS model.js / preview.js yazar) -->
+  <script src="model.js"></script>
+  <script src="preview.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
