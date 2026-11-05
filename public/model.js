@@ -1,6 +1,7 @@
 /**
  * Gemini API istemcisi — tarayıcıdan doğrudan çağrı (CORS destekli).
- * Varsayılan model: gemini-3.8-flash (ücretsiz katman).
+ * Varsayılan model: gemini-3.5-flash-lite (ücretsiz, daha az yoğun).
+ * Yoğunlukta (503) sırayla yedek modellere düşer.
  * Endpoint: .../v1beta/models/{model}:streamGenerateContent?alt=sse
  */
 (function (global) {
@@ -8,7 +9,13 @@
 
   var KEY_STORAGE = 'gemini_key';
   var MODEL_STORAGE = 'gemini_model';
-  var DEFAULT_MODEL = 'gemini-3.8-flash';
+  var DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+  var FALLBACK_MODELS = [
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.8-flash',
+  ];
   var API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
   var SYSTEM_PROMPT =
@@ -94,6 +101,15 @@
       quota.detail = bodyText;
       return quota;
     }
+    if (status === 503) {
+      var busy = new Error(
+        'Google modeli şu an yoğun (503). Biraz sonra tekrar dene veya Ayarlar’dan yenile.'
+      );
+      busy.code = 'unavailable';
+      busy.status = 503;
+      busy.detail = bodyText;
+      return busy;
+    }
     var generic = new Error(
       'Gemini API hatası (HTTP ' + status + ').' +
         (bodyText ? ' ' + String(bodyText).slice(0, 200) : '')
@@ -124,6 +140,18 @@
    * @param {{signal?: AbortSignal}} [opts]
    * @returns {Promise<string>}
    */
+  function buildModelList() {
+    var preferred = getModel();
+    var list = [];
+    function add(m) {
+      if (!m || list.indexOf(m) !== -1) return;
+      list.push(m);
+    }
+    add(preferred);
+    for (var i = 0; i < FALLBACK_MODELS.length; i++) add(FALLBACK_MODELS[i]);
+    return list;
+  }
+
   async function chat(messages, onChunk, opts) {
     opts = opts || {};
     var key = getKey();
@@ -135,13 +163,7 @@
       throw noKey;
     }
 
-    var model = getModel();
-    var url =
-      API_BASE +
-      '/' +
-      encodeURIComponent(model) +
-      ':streamGenerateContent?alt=sse';
-
+    var models = buildModelList();
     var body = {
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: toGeminiContents(messages || []),
@@ -150,29 +172,52 @@
       },
     };
 
-    var response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': key,
-        },
-        body: JSON.stringify(body),
-        signal: opts.signal,
-      });
-    } catch (err) {
-      throw turkishError(0, '', err);
-    }
-
-    if (!response.ok) {
-      var errText = '';
+    var response = null;
+    var lastErrText = '';
+    var lastStatus = 0;
+    for (var mi = 0; mi < models.length; mi++) {
+      var model = models[mi];
+      var url =
+        API_BASE +
+        '/' +
+        encodeURIComponent(model) +
+        ':streamGenerateContent?alt=sse';
       try {
-        errText = await response.text();
-      } catch (e) {
-        errText = '';
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': key,
+          },
+          body: JSON.stringify(body),
+          signal: opts.signal,
+        });
+      } catch (err) {
+        throw turkishError(0, '', err);
       }
-      throw turkishError(response.status, errText, null);
+      if (response.ok) {
+        if (model !== getModel()) {
+          try {
+            setModel(model);
+          } catch (e) {}
+        }
+        break;
+      }
+      lastStatus = response.status;
+      try {
+        lastErrText = await response.text();
+      } catch (e) {
+        lastErrText = '';
+      }
+      // Yoğunluk / geçici unavailable → sıradaki modele geç
+      if (lastStatus === 503 || lastStatus === 429) {
+        response = null;
+        continue;
+      }
+      throw turkishError(lastStatus, lastErrText, null);
+    }
+    if (!response || !response.ok) {
+      throw turkishError(lastStatus || 503, lastErrText, null);
     }
 
     if (!response.body || !response.body.getReader) {
