@@ -3,7 +3,7 @@
  * Sohbet merkezde akar; düşünme adımları ve araç çağrıları kart olarak görünür.
  * Yan panelde canlı önizleme ve sanal proje dosyaları yer alır.
  */
-(function () {
+(function (global) {
   'use strict';
 
   var CONTENTS_KEY = 'kodasistan.contents';
@@ -47,6 +47,7 @@
 
   var settingsDialog = $('#settings-dialog');
   var settingsForm = $('#settings-form');
+  var btnCancelSettings = $('#btn-cancel-settings');
   var apiKeyInput = $('#api-key-input');
   var modelInput = $('#model-input');
   var modelOptions = $('#model-options');
@@ -837,20 +838,33 @@
     global.Workspace.clear();
   });
 
-  settingsForm.addEventListener('submit', function (e) {
-    var submitter = e.submitter;
-    var val = submitter && submitter.value;
-    if (val === 'save') {
-      var k = apiKeyInput.value.trim();
-      if (k) global.Model.setKey(k);
-      var m = modelInput.value.trim();
-      if (m) global.Model.setModel(m);
-      setToolsEnabled(toolsInput.checked);
-      global.Agent.setInstructions(instructionsInput.value);
-      updateModelChip();
-      if (!contents.length) renderConversation();
-    }
+  function closeSettings() {
+    if (typeof settingsDialog.close === 'function') settingsDialog.close();
+    else settingsDialog.removeAttribute('open');
+  }
+
+  if (btnCancelSettings) {
+    btnCancelSettings.addEventListener('click', function () {
+      apiKeyInput.value = '';
+      closeSettings();
+    });
+  }
+
+  settingsDialog.addEventListener('click', function (e) {
+    if (e.target === settingsDialog) closeSettings();
+  });
+
+  settingsForm.addEventListener('submit', function () {
+    var k = apiKeyInput.value.trim();
+    if (k) global.Model.setKey(k);
+    var m = modelInput.value.trim();
+    if (m) global.Model.setModel(m);
+    setToolsEnabled(toolsInput.checked);
+    global.Agent.setInstructions(instructionsInput.value);
+    updateModelChip();
+    if (!contents.length) renderConversation();
     apiKeyInput.value = '';
+    closeSettings();
   });
 
   // Önizleme konsolu → hem Tools tamponuna hem alt konsol kutusuna
@@ -892,4 +906,4 @@
   setSideOpen(initialSideOpen);
   refreshPreview();
   renderConversation();
-})();
+})(typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : this);

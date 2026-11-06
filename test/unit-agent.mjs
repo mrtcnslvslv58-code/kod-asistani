@@ -320,4 +320,127 @@ const cand = (parts, extra = {}) => ({ candidates: [{ content: { role: 'model', 
   assert.ok(typeof w[0].parts[0].text === 'string', 'pencere kullanıcı metniyle başlamalı');
 }
 
-console.log('UNIT OK: Workspace, Tools, Model.generate, Agent döngüsü/iptal/yedek/pencere');
+// ---------- app.js DOM duman testi: Ayarlar aç/kaydet + mesaj gönder ----------
+{
+  function makeEl(id = '') {
+    const listeners = {};
+    const attrs = {};
+    const classes = new Set();
+    return {
+      id,
+      value: '',
+      checked: true,
+      disabled: false,
+      hidden: false,
+      innerHTML: '',
+      textContent: '',
+      placeholder: '',
+      srcdoc: '',
+      scrollTop: 0,
+      scrollHeight: 100,
+      style: {},
+      children: [],
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        toggle: (c, f) => {
+          if (f === undefined) f = !classes.has(c);
+          f ? classes.add(c) : classes.delete(c);
+          return f;
+        },
+        contains: (c) => classes.has(c),
+      },
+      setAttribute: (k, v) => {
+        attrs[k] = String(v);
+      },
+      getAttribute: (k) => attrs[k] || null,
+      removeAttribute: (k) => {
+        delete attrs[k];
+      },
+      appendChild(ch) {
+        this.children.push(ch);
+        return ch;
+      },
+      remove() {},
+      focus() {},
+      showModal() {
+        this.open = true;
+      },
+      close() {
+        this.open = false;
+      },
+      querySelectorAll: () => [],
+      addEventListener(ev, fn) {
+        (listeners[ev] = listeners[ev] || []).push(fn);
+      },
+      dispatch(ev, e = {}) {
+        (listeners[ev] || []).forEach((fn) => fn({ preventDefault() {}, target: this, ...e }));
+      },
+    };
+  }
+
+  const els = {};
+  const getEl = (sel) => {
+    const k = sel.replace(/^#/, '');
+    return (els[k] = els[k] || makeEl(k));
+  };
+  const store = {};
+  const sandbox = {
+    console,
+    TextEncoder,
+    TextDecoder,
+    Uint8Array,
+    Uint32Array,
+    AbortController,
+    ReadableStream,
+    Response,
+    setTimeout,
+    prompt: () => 'test.html',
+    confirm: () => true,
+    alert: () => {},
+    localStorage: {
+      getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => {
+        store[k] = String(v);
+      },
+      removeItem: (k) => {
+        delete store[k];
+      },
+    },
+    document: {
+      activeElement: null,
+      querySelector: (s) => getEl(s),
+      querySelectorAll: () => [makeEl('tab1'), makeEl('tab2')],
+      createElement: (tag) => makeEl(tag),
+      body: makeEl('body'),
+    },
+    addEventListener: () => {},
+  };
+  sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
+  sandbox.self = sandbox;
+  vm.createContext(sandbox);
+
+  for (const f of ['model.js', 'generate.js', 'preview.js', 'workspace.js', 'tools.js', 'agent.js', 'app.js']) {
+    vm.runInContext(fs.readFileSync(path.join(root, 'public', f), 'utf8'), sandbox, { filename: f });
+  }
+
+  els['btn-settings'].dispatch('click');
+  assert.strictEqual(els['settings-dialog'].open, true, 'Ayarlar açılmalı');
+
+  els['api-key-input'].value = 'AIzaTestKey123';
+  els['settings-form'].dispatch('submit');
+  assert.strictEqual(sandbox.Model.getKey(), 'AIzaTestKey123', 'Anahtar kaydedilmeli');
+  assert.strictEqual(els['settings-dialog'].open, false, 'Ayarlar kapanmalı');
+
+  sandbox.fetch = async () => sse([cand([{ text: 'Selam!' }])]);
+  els['chat-input'].value = 'Merhaba';
+  els['chat-form'].dispatch('submit');
+  await new Promise((r) => setTimeout(r, 30));
+  const saved = JSON.parse(store['kodasistan.contents'] || '[]');
+  assert.strictEqual(saved.length, 2, 'Kullanıcı ve model mesajı kaydedilmeli');
+  assert.strictEqual(saved[0].parts[0].text, 'Merhaba');
+  assert.strictEqual(saved[1].parts[0].text, 'Selam!');
+}
+
+console.log('UNIT OK: Workspace, Tools, Model.generate, Agent döngüsü/iptal/yedek/pencere, app.js DOM');
