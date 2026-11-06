@@ -393,6 +393,11 @@
     DEFAULT_MODEL: DEFAULT_MODEL,
     API_BASE: API_BASE,
     SYSTEM_PROMPT: SYSTEM_PROMPT,
+    FALLBACK_MODELS: FALLBACK_MODELS,
+    _internal: {
+      turkishError: turkishError,
+      buildModelList: buildModelList,
+    },
   };
 
   global.Model = Model;

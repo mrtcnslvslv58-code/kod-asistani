@@ -12,97 +12,115 @@
       <span class="brand-mark">&lt;/&gt;</span>
       <h1>KodAsistan</h1>
     </div>
-
     <div class="topbar-controls">
-      <label class="lang-select">
-        <span class="sr-only">Dil</span>
-        <select id="lang-select" title="Dosya dili">
-          <option value="html">HTML</option>
-          <option value="css">CSS</option>
-          <option value="js">JavaScript</option>
-          <option value="single">Tek dosya</option>
-        </select>
-      </label>
+      <button type="button" id="btn-model" class="chip" title="Model ve ayarlar"></button>
+      <button type="button" id="btn-new" class="btn btn-ghost" title="Yeni sohbet başlat">Yeni sohbet</button>
+      <button type="button" id="btn-panel" class="btn btn-ghost" title="Proje panelini aç/kapat" aria-pressed="false">Proje</button>
       <button type="button" id="btn-settings" class="btn btn-ghost" title="Ayarlar">Ayarlar</button>
     </div>
   </header>
 
-  <main class="layout">
-    <!-- Sol: sohbet -->
-    <section class="panel chat-panel" aria-label="Sohbet">
-      <div class="panel-header">
-        <h2>Sohbet</h2>
-        <button type="button" id="btn-clear-chat" class="btn btn-tiny" title="Geçmişi temizle">Temizle</button>
-      </div>
+  <main class="layout" id="layout">
+    <!-- Sohbet -->
+    <section class="chat-col" aria-label="Sohbet">
       <div id="chat-messages" class="chat-messages" role="log" aria-live="polite"></div>
-      <form id="chat-form" class="chat-form">
+      <div id="notice" class="notice" hidden></div>
+      <form id="chat-form" class="composer">
         <textarea
           id="chat-input"
-          rows="2"
-          placeholder="Ne yapmak istiyorsun? (Enter gönder, Shift+Enter satır)"
+          rows="1"
+          placeholder="Ne yapmak istiyorsun? (Enter gönder, Shift+Enter yeni satır)"
           autocomplete="off"
         ></textarea>
         <button type="submit" id="btn-send" class="btn btn-primary">Gönder</button>
+        <button type="button" id="btn-stop" class="btn btn-danger" hidden>Durdur</button>
       </form>
     </section>
 
-    <!-- Orta: kod -->
-    <section class="panel editor-panel" aria-label="Kod editörü">
-      <div class="panel-header">
-        <h2>Kod</h2>
-        <span id="editor-lang-label" class="muted">HTML</span>
+    <!-- Proje paneli: önizleme + dosyalar -->
+    <aside class="side" id="side" aria-label="Proje paneli">
+      <div class="side-tabs" role="tablist">
+        <button type="button" class="tab on" data-tab="preview" role="tab">Önizleme</button>
+        <button type="button" class="tab" data-tab="files" role="tab">Dosyalar <span id="file-count" class="badge">0</span></button>
+        <span class="spacer"></span>
+        <button type="button" id="btn-refresh-preview" class="btn btn-tiny" title="Önizlemeyi yenile">Yenile</button>
+        <button type="button" id="btn-close-panel" class="btn btn-tiny side-close" title="Paneli kapat">Kapat</button>
       </div>
-      <textarea
-        id="code-editor"
-        class="code-editor"
-        spellcheck="false"
-        placeholder="<!-- Kod burada görünecek -->"
-      ></textarea>
-    </section>
 
-    <!-- Sağ/alt: önizleme -->
-    <section class="panel preview-panel" aria-label="Önizleme">
-      <div class="panel-header">
-        <h2>Önizleme</h2>
-        <div class="preview-actions">
-          <button type="button" id="btn-refresh-preview" class="btn btn-tiny">Yenile</button>
-          <button type="button" id="btn-download" class="btn btn-tiny">İndir</button>
+      <div class="pane" id="pane-preview">
+        <div class="preview-frame-wrap">
+          <iframe id="preview-frame" title="Canlı önizleme" sandbox="allow-scripts allow-forms allow-modals"></iframe>
+          <div id="preview-placeholder" class="preview-placeholder">Önizleme burada görünecek</div>
+        </div>
+        <div id="console-log" class="console-log" hidden></div>
+      </div>
+
+      <div class="pane" id="pane-files" hidden>
+        <div class="files-bar">
+          <button type="button" id="btn-file-new" class="btn btn-tiny">Yeni dosya</button>
+          <button type="button" id="btn-file-del" class="btn btn-tiny">Sil</button>
+          <button type="button" id="btn-download" class="btn btn-tiny">İndir (zip)</button>
+          <button type="button" id="btn-clear-project" class="btn btn-tiny">Projeyi temizle</button>
+        </div>
+        <div class="files-body">
+          <ul id="file-list" class="file-list"></ul>
+          <div class="editor-wrap">
+            <div id="editor-name" class="editor-name muted">Dosya seç</div>
+            <textarea id="code-editor" class="code-editor" spellcheck="false" placeholder="Bir dosya seç ya da asistandan oluşturmasını iste"></textarea>
+          </div>
         </div>
       </div>
-      <div class="preview-frame-wrap">
-        <iframe id="preview-frame" title="Canlı önizleme" sandbox="allow-scripts allow-same-origin"></iframe>
-        <div id="preview-placeholder" class="preview-placeholder">
-          Önizleme burada görünecek
-        </div>
-      </div>
-      <div id="console-log" class="console-log" hidden></div>
-    </section>
+    </aside>
   </main>
 
-  <!-- Ayarlar modal -->
+  <!-- Ayarlar -->
   <dialog id="settings-dialog" class="settings-dialog">
     <form method="dialog" id="settings-form" class="settings-form">
       <h3>Ayarlar</h3>
+
       <label class="field">
         <span>Gemini API anahtarı</span>
-        <input
-          type="password"
-          id="api-key-input"
-          autocomplete="off"
-          placeholder="AIza… (değer maskelenir)"
-        />
+        <input type="password" id="api-key-input" autocomplete="off" placeholder="AIza… (değer maskelenir)" />
       </label>
       <p class="hint">Anahtar yalnızca bu tarayıcıda localStorage’da saklanır; sohbete yazılmaz.</p>
+
+      <label class="field">
+        <span>Model</span>
+        <input type="text" id="model-input" list="model-options" autocomplete="off" />
+        <datalist id="model-options"></datalist>
+      </label>
+      <p class="hint">Yoğunlukta (503) ya da kota dolunca otomatik olarak yedek modellere geçilir.</p>
+
+      <label class="check">
+        <input type="checkbox" id="tools-input" />
+        <span>Araçları kullan (dosya yaz/oku/düzenle, konsolu kontrol et)</span>
+      </label>
+
+      <label class="field">
+        <span>Özel talimatlar</span>
+        <textarea id="instructions-input" rows="4" placeholder="Örn: Her zaman koyu tema kullan. Kısa açıkla."></textarea>
+      </label>
+      <p class="hint">Asistan her yanıtta bu talimatlara uyar. Onu kendine göre şekillendirmenin yolu budur.</p>
+
+      <div class="field">
+        <span>Hafıza</span>
+        <ul id="memory-list" class="memory-list"></ul>
+        <p class="hint" id="memory-empty">Henüz not yok. Asistan kalıcı tercihlerini buraya kaydeder.</p>
+      </div>
+
       <div class="dialog-actions">
         <button type="submit" value="cancel" class="btn btn-ghost">İptal</button>
-        <button type="submit" value="save" class="btn btn-primary" id="btn-save-key">Kaydet</button>
+        <button type="submit" value="save" class="btn btn-primary" id="btn-save-settings">Kaydet</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Sıra: model → preview → app (REİS model.js / preview.js yazar) -->
   <script src="model.js"></script>
+  <script src="generate.js"></script>
   <script src="preview.js"></script>
+  <script src="workspace.js"></script>
+  <script src="tools.js"></script>
+  <script src="agent.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

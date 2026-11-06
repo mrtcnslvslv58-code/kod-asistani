@@ -46,7 +46,7 @@ const Preview = previewBox.Preview;
 
 assert.ok(Model, 'Model yüklendi');
 assert.ok(Preview, 'Preview yüklendi');
-assert.strictEqual(Model.DEFAULT_MODEL, 'gemini-3.8-flash');
+assert.strictEqual(Model.DEFAULT_MODEL, 'gemini-3.5-flash-lite');
 
 // --- parseFiles ---
 {
